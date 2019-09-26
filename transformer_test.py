@@ -10,7 +10,7 @@ from pprint import pprint
 from IPython.display import clear_output
 
 print(tf.__version__)
-logging.basicConfig(level=logging.ERROR)  # change the log level to error
+logging.basicConfig(level="ERROR")  # change the log level to error
 np.set_printoptions(suppress=True)  # let the numpy do not print out as the scientific pattern
 
 # setting the download file location and variables
@@ -80,5 +80,6 @@ except:
 
 print(f"字典大小：{subword_encoder_en.vocab_size}")
 print(f"前 10 個 subwords：{subword_encoder_en.subwords[:10]}")
+print()
 # end = time.process_time()
 # print(end-start)
