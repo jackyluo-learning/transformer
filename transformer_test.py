@@ -54,8 +54,8 @@ train_examples, val_examples, _ = examples
 # output some data as example
 sample_examples = []
 for en, zh in train_examples.take(3):
-    en = en.numpy().decode("utf-8")  # use numpy().decode the string into utf-8 format
-    zh = zh.numpy().decode("utf-8")
+    # en = en.numpy().decode("utf-8")  # use numpy().decode the string into utf-8 format
+    # zh = zh.numpy().decode("utf-8")
 
     # print(en)
     # print(zh)
@@ -97,32 +97,33 @@ for index in indices:
 # construct a Chinese dictionary
 start = time.process_time()
 try:
-  subword_encoder_zh = tfds.features.text.SubwordTextEncoder.load_from_file(zh_vocab_file)
-  print(f"載入已建立的中文字典： {zh_vocab_file}")
+    subword_encoder_zh = tfds.features.text.SubwordTextEncoder.load_from_file(zh_vocab_file)
+    print(f"載入已建立的中文字典： {zh_vocab_file}")
 except:
-  print("沒有已建立的中文字典，從頭建立。")
-  subword_encoder_zh = tfds.features.text.SubwordTextEncoder.build_from_corpus(
-    (zh.numpy() for _, zh in train_examples),  # here should be _, zh, as the pair in training_set is like en-zh
-    target_vocab_size=2 ** 13,max_subword_length=1)  # 有需要可以調整字典大小, 每一个中文字是一个单位
+    print("沒有已建立的中文字典，從頭建立。")
+    subword_encoder_zh = tfds.features.text.SubwordTextEncoder.build_from_corpus(
+        (zh.numpy() for _, zh in train_examples),  # here should be _, zh, as the pair in training_set is like en-zh
+        target_vocab_size=2 ** 13, max_subword_length=1)  # 有需要可以調整字典大小, 每一个中文字是一个单位
 
-  # 將字典檔案存下以方便下次 warmstart
-  subword_encoder_zh.save_to_file(zh_vocab_file)
+    # 將字典檔案存下以方便下次 warmstart
+    subword_encoder_zh.save_to_file(zh_vocab_file)
 
 print(f"中文字典大小：{subword_encoder_zh.vocab_size}")
 # print(f"前 10 個 subwords：{subword_encoder_en.subwords[:10]}")
 # print()
 end = time.process_time()
-print("耗时：", end-start)
+print("耗时：", end - start)
 
 string = sample_examples[0]
 zh_string = string[1]
-print("each in sample_example:",string,10*'-',"\nthe Chinese part: ",zh_string,10*'-', "\nis the item in sample_example a tuple?", isinstance(string,tuple))
+print("each in sample_example:", string, 10 * '-', "\nthe Chinese part: ", zh_string, 10 * '-',
+      "\nis the item in sample_example a tuple?", isinstance(string, tuple))
 sample_string = sample_examples[0][1]
 indices = subword_encoder_zh.encode(sample_string)
-print("index of the string: ",indices)
+print("index of the string: ", indices)
 
 for index in indices:
-    print(index, 5*' ', subword_encoder_zh.decode([index]))
+    print(index, 5 * ' ', subword_encoder_zh.decode([index]))
 
 en = "The eurozone’s collapse forces a major realignment of European politics."
 zh = "欧元区的瓦解强迫欧洲政治进行一次重大改组。"
@@ -140,7 +141,25 @@ print()
 print("[英中序列]（轉換後）")
 print(en_indices)
 print(zh_indices)
+print(100*'-')
+
 
 # pre-process:
 # insert a special token in both the beginning and the end of seq:
+def encode(en_t, zh_t):
+    # 因為字典的索引從 0 開始，
+    # 我們可以使用 subword_encoder_en.vocab_size 這個值作為 BOS 的索引值
+    # 用 subword_encoder_en.vocab_size + 1 作為 EOS 的索引值
+    en_indices = [subword_encoder_en.vocab_size] + subword_encoder_en.encode(
+        en_t.numpy()) + [subword_encoder_en.vocab_size + 1]
+    # 同理，不過是使用中文字典的最後一個索引 + 1
+    zh_indices = [subword_encoder_zh.vocab_size] + subword_encoder_zh.encode(
+        zh_t.numpy()) + [subword_encoder_zh.vocab_size + 1]
 
+    return en_indices, zh_indices
+
+en,zh = next(iter(train_examples))  # here en,zh are just Tensor:<tf.Tensor: id=248, shape=(), dtype=string, numpy=b'Making Do With More'>
+en_t, zh_t = encode(en,zh)
+pprint((en,zh))
+print("after pre-process:")
+pprint((en_t,zh_t))
