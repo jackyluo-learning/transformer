@@ -9,7 +9,6 @@ from pprint import pprint
 logging.basicConfig(level=logging.ERROR)
 np.set_printoptions(suppress=True)
 
-
 demo_examples = [
     ("It is important.", "这很重要。"),
     ("The numbers speak for themselves.", "数字证明了一切。"),
@@ -47,16 +46,16 @@ def tf_encode(en_t,
 
 
 demo_examples = demo_examples.map(tf_encode)
-demo_examples = demo_examples.padded_batch(batch_size, padded_shapes=([10],[10]))
+demo_examples = demo_examples.padded_batch(batch_size, padded_shapes=([10], [10]))
 
-en,zh = next(iter(demo_examples))
+en, zh = next(iter(demo_examples))
 print("encode the two set of en-zh sentence: ")
-pprint((en,zh))
-print(100*'-')
+pprint((en, zh))
+print(100 * '-')
 
 # embedding:
-vocab_size_en = en_dict.vocab_size+2  # because add two more tokens: <start>,<end>
-vocab_size_zh = zh_dict.vocab_size+2
+vocab_size_en = en_dict.vocab_size + 2  # because add two more tokens: <start>,<end>
+vocab_size_zh = zh_dict.vocab_size + 2
 
 # transform each word in dictionary from one dim to 4 dim,
 # by create a embedding layer
@@ -69,8 +68,19 @@ emb_zh = embedding_layer_zh(zh)
 print("after embedding:")
 print(emb_en)
 print(emb_zh)
+print(100 * '-')
 
 
+# padding mask: mask those pad with 0
+def create_padding_mask(seq):
+    # padding mask 的工作就是把索引序列中為 0 的位置設為 1
+    mask = tf.cast(tf.equal(seq, 0), tf.float32)  # tf.equal(): compare each in seq to 0, equal return True.
+    return mask[:, tf.newaxis, tf.newaxis, :]  # broadcasting
 
 
+en_mask = create_padding_mask(en)
+print(en_mask)
 
+print("en:", en)
+print("-" * 100)
+print("tf.squeeze(en_mask):", tf.squeeze(en_mask))
