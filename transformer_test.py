@@ -54,8 +54,8 @@ train_examples, val_examples, _ = examples
 # output some data as example
 sample_examples = []
 for en, zh in train_examples.take(3):
-    # en = en.numpy().decode("utf-8")  # use numpy().decode the string into utf-8 format
-    # zh = zh.numpy().decode("utf-8")
+    en = en.numpy().decode("utf-8")  # use numpy().decode the string into utf-8 format
+    zh = zh.numpy().decode("utf-8")
 
     # print(en)
     # print(zh)
@@ -141,12 +141,12 @@ print()
 print("[英中序列]（轉換後）")
 print(en_indices)
 print(zh_indices)
-print(100*'-')
+print(100 * '-')
 
 
 # pre-process:
 # insert a special token in both the beginning and the end of seq:
-def encode(en_t, zh_t):
+def encode(en_t, zh_t):  # now the en_t,zh_t are eager tensor
     # 因為字典的索引從 0 開始，
     # 我們可以使用 subword_encoder_en.vocab_size 這個值作為 BOS 的索引值
     # 用 subword_encoder_en.vocab_size + 1 作為 EOS 的索引值
@@ -158,8 +158,61 @@ def encode(en_t, zh_t):
 
     return en_indices, zh_indices
 
-en,zh = next(iter(train_examples))  # here en,zh are just Tensor:<tf.Tensor: id=248, shape=(), dtype=string, numpy=b'Making Do With More'>
-en_t, zh_t = encode(en,zh)
-pprint((en,zh))
+
+en, zh = next(iter(
+    train_examples))  # here en,zh are just Tensor:<tf.Tensor: id=248, shape=(), dtype=string, numpy=b'Making Do With More'>
+en_t, zh_t = encode(en, zh)
+pprint((en, zh))
 print("after pre-process:")
-pprint((en_t,zh_t))
+pprint((en_t, zh_t))
+
+
+def tf_encode(en_t,
+              zh_t):  # because in the dataset.map(), which is run in Graph mode instead of eager mode, so the en_t, zh_t are not eager tensor, which do not contain the .numpy()
+    return tf.py_function(encode, [en_t, zh_t], [tf.int64,
+                                                 tf.int64])  # this will wrap the encode() into a eager mode enabled function in Graph mode when do the map() later on.
+
+
+train_dataset = train_examples.map(tf_encode)
+print(100 * '-')
+print("after pre-processed the whole trainning dataset: (take one pair example)")
+en_indices, zh_indices = next(iter(train_dataset))
+pprint((en_indices.numpy(), zh_indices.numpy()))
+print(100*'-')
+
+
+# filter the sequences that more than 40 tokens.
+print("filter the sequences that more than 40: ")
+MAX_LENGTH = 40
+
+def filter_max_length(en, zh, max_length=MAX_LENGTH):
+    return tf.logical_and(tf.size(en) <= max_length,
+                          tf.size(zh) <= max_length)
+
+
+train_dataset = train_dataset.filter(filter_max_length)
+
+# check after the filter
+num_of_data = 0
+num_of_invaild = 0
+for each in train_dataset:
+    en,zh = each
+    if tf.size(en) <= MAX_LENGTH and tf.size(zh) <= MAX_LENGTH:
+        num_of_data+=1
+    else:
+        num_of_invaild+=1
+
+print(f"the train_dateset has {num_of_invaild} invalid data, and total {num_of_data} remained valid data")
+print(100*'-')
+
+# construct a batch
+# when constructing a batch, the length of each sequence need to be padded, so that there are in the same shape
+print("after batch and pad: ")
+BATCH_SIZE = 64
+train_dataset = train_dataset.padded_batch(BATCH_SIZE,padded_shapes=([-1],[-1]))
+en_batch,zh_batch = next(iter(train_dataset))
+print("English batch:")
+print(en_batch)
+print(20*'-')
+print("Chinese batch:")
+print(zh_batch)
