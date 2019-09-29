@@ -209,10 +209,12 @@ print(100*'-')
 # when constructing a batch, the length of each sequence need to be padded, so that there are in the same shape
 print("after batch and pad: ")
 BATCH_SIZE = 64
-train_dataset = train_dataset.padded_batch(BATCH_SIZE,padded_shapes=([-1],[-1]))
+train_dataset = train_dataset.padded_batch(BATCH_SIZE,padded_shapes=([-1],[-1]))  # padded_shapes: when None and -1, that means the shape of each element before batch will be padded 0 utill reach the maximun length of element in the batch
 en_batch,zh_batch = next(iter(train_dataset))
 print("English batch:")
 print(en_batch)
 print(20*'-')
 print("Chinese batch:")
 print(zh_batch)
+
+
