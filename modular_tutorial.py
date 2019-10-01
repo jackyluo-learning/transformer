@@ -85,7 +85,7 @@ print(en_mask)
 print("en:", en)
 print("-" * 100)
 print("tf.squeeze(en_mask):", tf.squeeze(en_mask))
-print(100*'-')
+print(100 * '-')
 
 # 注意力機制（或稱注意函式，attention function）概念上就是拿一個查詢（query）去跟一組 key-values 做運算，最後產生一個輸出。只是我們會利用矩陣運算同時讓多個查詢跟一組 key-values
 # 做運算，最大化計算效率。 Scaled dot product attention 跟以往 multiplicative attention 一樣是先將維度相同的 Q 跟 K
@@ -102,9 +102,48 @@ print("scaled dot product attention:")
 # q 跟 k 都代表同個張量 emb_inp，因此 attention_weights 事實上就代表了 emb_inp 裡頭每個英文序列中的子詞對其他位置的子詞的注意權重。
 # output 則是句子裡頭每個位置的子詞將 attention_weights 當作權重，從其他位置的子詞對應的資訊 v 裡頭抽取有用訊息後匯總出來的結果。
 mask = None
-output,attention_weights = scaled_dot_product_attention(q,k,v,mask)
-print("output:",output)
-print("-"*100)
-print("attention_weights:",attention_weights)
-
+output, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+print("output:", output)
+print("-" * 100)
+print("attention_weights:", attention_weights)
+print(100 * '-')
 # mask in scaled_dot_product_attention
+#  q 跟 k 都是從 emb_inp 來的。emb_inp 代表著英文句子的詞嵌入張量，而裡頭的第一個句子應該是有 <pad> token,
+# 因此在注意函式裡頭，我們將遮罩乘上一個接近負無窮大的 -1e9，並把它加到進入 softmax 前的 logits 上面。這樣可以讓這些被加上極大負值的位置變得無關緊要，在經過 softmax 以後的值趨近於 0。
+output, attention_weights = scaled_dot_product_attention(q, k, v, tf.squeeze(en_mask, axis=1))
+print("attention_weights after masked:", attention_weights)
+print(100 * '-')
+
+
+# 在 padding mask 的幫助下，注意函式輸出的新序列 output 裡頭的每個子詞都只從序列 k （也就是序列 q 自己）的前 6 個實際子詞而非 <pad> 來獲得語義資訊
+
+# look ahead mask
+# 建立一個 2 維矩陣，維度為 (size, size)，
+# 其遮罩為一個右上角的三角形
+def create_look_ahead_mask(size):
+    mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
+    return mask  # (seq_len, seq_len)
+
+seq_len = emb_zh.shape[1]
+look_ahead_mask = create_look_ahead_mask(seq_len)
+print("emb_zh:",emb_zh)
+print(100*'-')
+print("look ahead mask:",look_ahead_mask)
+print(100*'-')
+
+# simulation of decoder
+print("simulation of decoder:")
+dec_q=dec_k = emb_zh
+dec_v = tf.cast(tf.math.greater(tf.random.uniform(shape=emb_zh.shape), 0.5), tf.float32)
+print("v:",dec_v)
+
+output,attention_weights = scaled_dot_product_attention(dec_q,dec_k,dec_v,look_ahead_mask)
+print("attention_weights:",attention_weights)
+# 就跟一般的 Seq2Seq 模型相同，Transformer 裡頭的 Decoder 在生成輸出序列時也是一次產生一個子詞。因此跟輸入的英文句子不同，中文句子裡頭的每個子詞都是在不同時間點產生的。所以理論上 Decoder
+# 在時間點 t - 1 （或者說是位置 t - 1）已經生成的子詞 subword_t_minus_1 在生成的時候是不可能能夠關注到下個時間點 t（位置 t）所生成的子詞 subword_t 的，儘管它們在 Transformer
+# 裡頭同時被做矩陣運算。
+print("attention_weights of the first word:", attention_weights[:,0,:])
+# 兩個句子的第一個子詞因為自己前面已經沒有其他子詞，所以將全部的注意力 1都放在自己身上。
+print("attention_weights of the second word:", attention_weights[:,1,:])
+# 兩個句子的第 2 個子詞因為只能看到序列中的第一個子詞以及自己，因此前兩個位置的注意權重加總即為 1，後面位置的權重皆為 0。
+
