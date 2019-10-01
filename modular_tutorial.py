@@ -4,6 +4,7 @@ import load_dictionary as ld
 import load_dataset as lds
 import logging
 import numpy as np
+from scaled_dot_product_attention import scaled_dot_product_attention
 from pprint import pprint
 
 logging.basicConfig(level=logging.ERROR)
@@ -84,3 +85,26 @@ print(en_mask)
 print("en:", en)
 print("-" * 100)
 print("tf.squeeze(en_mask):", tf.squeeze(en_mask))
+print(100*'-')
+
+# 注意力機制（或稱注意函式，attention function）概念上就是拿一個查詢（query）去跟一組 key-values 做運算，最後產生一個輸出。只是我們會利用矩陣運算同時讓多個查詢跟一組 key-values
+# 做運算，最大化計算效率。 Scaled dot product attention 跟以往 multiplicative attention 一樣是先將維度相同的 Q 跟 K
+# 做點積：將對應維度的值兩兩相乘後相加得到單一數值，接著把這些數值除以一個 scaling factor sqrt(dk) ，然後再丟入 softmax 函式得到相加為 1 的注意權重（attention weights）。
+# scaled dot product attention
+tf.random.set_seed(9527)  # set a seed tha can enable us to get the same value every time.
+q = emb_en
+k = emb_en
+# generate a tensor that has the same shape of emb_en
+v = tf.cast(tf.math.greater(tf.random.uniform(shape=emb_en.shape), 0.5), tf.float32)
+print(v)
+
+print("scaled dot product attention:")
+# q 跟 k 都代表同個張量 emb_inp，因此 attention_weights 事實上就代表了 emb_inp 裡頭每個英文序列中的子詞對其他位置的子詞的注意權重。
+# output 則是句子裡頭每個位置的子詞將 attention_weights 當作權重，從其他位置的子詞對應的資訊 v 裡頭抽取有用訊息後匯總出來的結果。
+mask = None
+output,attention_weights = scaled_dot_product_attention(q,k,v,mask)
+print("output:",output)
+print("-"*100)
+print("attention_weights:",attention_weights)
+
+# mask in scaled_dot_product_attention
