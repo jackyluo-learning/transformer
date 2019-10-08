@@ -5,6 +5,7 @@ import load_dataset as lds
 import logging
 import numpy as np
 from scaled_dot_product_attention import scaled_dot_product_attention
+from split_heads import split_heads
 from pprint import pprint
 
 logging.basicConfig(level=logging.ERROR)
@@ -146,4 +147,17 @@ print("attention_weights of the first word:", attention_weights[:,0,:])
 # 兩個句子的第一個子詞因為自己前面已經沒有其他子詞，所以將全部的注意力 1都放在自己身上。
 print("attention_weights of the second word:", attention_weights[:,1,:])
 # 兩個句子的第 2 個子詞因為只能看到序列中的第一個子詞以及自己，因此前兩個位置的注意權重加總即為 1，後面位置的權重皆為 0。
+print(100*'-')
 
+# multi-head attention
+# 將 Q、K 以及 V 這三個張量先個別轉換到 d_model 維空間，再將其拆成多個比較低維的 depth 維度 N 次以後，將這些產生的小 q、小 k 以及小 v
+# 分別丟入前面的注意函式得到 N 個結果。接著將這 N 個 heads 的結果串接起來，最後通過一個線性轉換就能得到 multi-head attention 的輸出
+# transform a d_model vectoer into a num_heads * depth vector: (d_model: the dim of each word: 4)
+num_heads = 2
+x = emb_en
+output = split_heads(emb_en,d_model,num_heads)
+print("before multi-head transform:", x)
+print("after multi-head transform:",output)
+# 3 維詞嵌入張量 emb_en 已經被轉換成一個 4 維張量了，且最後一個維度 shape[-1] = 4 被拆成兩半.
+# 觀察 split_heads 的輸入輸出，你會發現序列裡每個子詞原來為 d_model 維的
+# reprsentation 被拆成多個相同但較短的 depth 維度。而每個 head 的 2 維矩陣事實上仍然代表原來的序列，只是裡頭子詞的 repr. 維度降低了。
