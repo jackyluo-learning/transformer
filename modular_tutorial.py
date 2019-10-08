@@ -4,6 +4,8 @@ import load_dictionary as ld
 import load_dataset as lds
 import logging
 import numpy as np
+
+from MultiHeadAttention import MultiHeadAttention
 from scaled_dot_product_attention import scaled_dot_product_attention
 from split_heads import split_heads
 from pprint import pprint
@@ -103,7 +105,7 @@ print("scaled dot product attention:")
 # q 跟 k 都代表同個張量 emb_inp，因此 attention_weights 事實上就代表了 emb_inp 裡頭每個英文序列中的子詞對其他位置的子詞的注意權重。
 # output 則是句子裡頭每個位置的子詞將 attention_weights 當作權重，從其他位置的子詞對應的資訊 v 裡頭抽取有用訊息後匯總出來的結果。
 mask = None
-output, attention_weights = scaled_dot_product_attention(q, k, v, mask)
+output, attention_weights,_ = scaled_dot_product_attention(q, k, v, mask)
 print("output:", output)
 print("-" * 100)
 print("attention_weights:", attention_weights)
@@ -111,8 +113,9 @@ print(100 * '-')
 # mask in scaled_dot_product_attention
 #  q 跟 k 都是從 emb_inp 來的。emb_inp 代表著英文句子的詞嵌入張量，而裡頭的第一個句子應該是有 <pad> token,
 # 因此在注意函式裡頭，我們將遮罩乘上一個接近負無窮大的 -1e9，並把它加到進入 softmax 前的 logits 上面。這樣可以讓這些被加上極大負值的位置變得無關緊要，在經過 softmax 以後的值趨近於 0。
-output, attention_weights = scaled_dot_product_attention(q, k, v, tf.squeeze(en_mask, axis=1))
+output, attention_weights,_ = scaled_dot_product_attention(q, k, v, tf.squeeze(en_mask, axis=1))
 print("attention_weights after masked:", attention_weights)
+print("output:", output)
 print(100 * '-')
 
 
@@ -138,7 +141,7 @@ dec_q=dec_k = emb_zh
 dec_v = tf.cast(tf.math.greater(tf.random.uniform(shape=emb_zh.shape), 0.5), tf.float32)
 print("v:",dec_v)
 
-output,attention_weights = scaled_dot_product_attention(dec_q,dec_k,dec_v,look_ahead_mask)
+output,attention_weights,_ = scaled_dot_product_attention(dec_q,dec_k,dec_v,look_ahead_mask)
 print("attention_weights:",attention_weights)
 # 就跟一般的 Seq2Seq 模型相同，Transformer 裡頭的 Decoder 在生成輸出序列時也是一次產生一個子詞。因此跟輸入的英文句子不同，中文句子裡頭的每個子詞都是在不同時間點產生的。所以理論上 Decoder
 # 在時間點 t - 1 （或者說是位置 t - 1）已經生成的子詞 subword_t_minus_1 在生成的時候是不可能能夠關注到下個時間點 t（位置 t）所生成的子詞 subword_t 的，儘管它們在 Transformer
@@ -158,6 +161,38 @@ x = emb_en
 output = split_heads(emb_en,d_model,num_heads)
 print("before multi-head transform:", x)
 print("after multi-head transform:",output)
+print(100*'-')
 # 3 維詞嵌入張量 emb_en 已經被轉換成一個 4 維張量了，且最後一個維度 shape[-1] = 4 被拆成兩半.
 # 觀察 split_heads 的輸入輸出，你會發現序列裡每個子詞原來為 d_model 維的
 # reprsentation 被拆成多個相同但較短的 depth 維度。而每個 head 的 2 維矩陣事實上仍然代表原來的序列，只是裡頭子詞的 repr. 維度降低了。
+
+# test MultiHeadAttention:
+assert d_model == emb_en.shape[-1]  == 4
+num_heads = 2
+
+print(f"d_model: {d_model}")
+print(f"num_heads: {num_heads}\n")
+
+# 初始化一個 multi-head attention layer
+mha = MultiHeadAttention(d_model, num_heads)
+
+# 簡單將 v, k, q 都設置為 `emb_inp`
+# 順便看看 padding mask 的作用。
+# 別忘記，第一個英文序列的最後兩個 tokens 是 <pad>
+v = k = q = emb_en
+padding_mask = create_padding_mask(en)
+print("q.shape:", q.shape)
+print("k.shape:", k.shape)
+print("v.shape:", v.shape)
+print("padding_mask.shape:", padding_mask.shape)
+
+wq, wk, wv, output, scaled_attention, attention_weights, scaled_attention_logits = mha(v, k, q, mask)
+print("wq.shape:", wq.shape)
+print("wk.shape:", wk.shape)
+print("wv.shape:", wv.shape)
+print("output.shape:", output.shape)
+print("scaled output.shape:",scaled_attention.shape)
+print("attention_weights.shape:", attention_weights.shape)
+print("scaled_attention_logits.shape:", scaled_attention_logits.shape)
+
+print("\noutput:", output)

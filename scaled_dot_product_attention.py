@@ -34,4 +34,6 @@ def scaled_dot_product_attention(q, k, v, mask):
     # 以注意權重對 v 做加權平均（weighted average）
     output = tf.matmul(attention_weights, v)  # (..., seq_len_q, depth_v)
 
-    return output, attention_weights
+    return output, attention_weights, scaled_attention_logits
+
+
