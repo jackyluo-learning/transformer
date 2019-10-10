@@ -9,6 +9,7 @@ from MultiHeadAttention import MultiHeadAttention
 from scaled_dot_product_attention import scaled_dot_product_attention
 from split_heads import split_heads
 from pprint import pprint
+from position_wise_feed_forward_network import point_wise_feed_forward_network
 
 logging.basicConfig(level=logging.ERROR)
 np.set_printoptions(suppress=True)
@@ -105,7 +106,7 @@ print("scaled dot product attention:")
 # q 跟 k 都代表同個張量 emb_inp，因此 attention_weights 事實上就代表了 emb_inp 裡頭每個英文序列中的子詞對其他位置的子詞的注意權重。
 # output 則是句子裡頭每個位置的子詞將 attention_weights 當作權重，從其他位置的子詞對應的資訊 v 裡頭抽取有用訊息後匯總出來的結果。
 mask = None
-output, attention_weights,_ = scaled_dot_product_attention(q, k, v, mask)
+output, attention_weights, _ = scaled_dot_product_attention(q, k, v, mask)
 print("output:", output)
 print("-" * 100)
 print("attention_weights:", attention_weights)
@@ -113,7 +114,7 @@ print(100 * '-')
 # mask in scaled_dot_product_attention
 #  q 跟 k 都是從 emb_inp 來的。emb_inp 代表著英文句子的詞嵌入張量，而裡頭的第一個句子應該是有 <pad> token,
 # 因此在注意函式裡頭，我們將遮罩乘上一個接近負無窮大的 -1e9，並把它加到進入 softmax 前的 logits 上面。這樣可以讓這些被加上極大負值的位置變得無關緊要，在經過 softmax 以後的值趨近於 0。
-output, attention_weights,_ = scaled_dot_product_attention(q, k, v, tf.squeeze(en_mask, axis=1))
+output, attention_weights, _ = scaled_dot_product_attention(q, k, v, tf.squeeze(en_mask, axis=1))
 print("attention_weights after masked:", attention_weights)
 print("output:", output)
 print(100 * '-')
@@ -128,29 +129,30 @@ def create_look_ahead_mask(size):
     mask = 1 - tf.linalg.band_part(tf.ones((size, size)), -1, 0)
     return mask  # (seq_len, seq_len)
 
+
 seq_len = emb_zh.shape[1]
 look_ahead_mask = create_look_ahead_mask(seq_len)
-print("emb_zh:",emb_zh)
-print(100*'-')
-print("look ahead mask:",look_ahead_mask)
-print(100*'-')
+print("emb_zh:", emb_zh)
+print(100 * '-')
+print("look ahead mask:", look_ahead_mask)
+print(100 * '-')
 
 # simulation of decoder
 print("simulation of decoder:")
-dec_q=dec_k = emb_zh
+dec_q = dec_k = emb_zh
 dec_v = tf.cast(tf.math.greater(tf.random.uniform(shape=emb_zh.shape), 0.5), tf.float32)
-print("v:",dec_v)
+print("v:", dec_v)
 
-output,attention_weights,_ = scaled_dot_product_attention(dec_q,dec_k,dec_v,look_ahead_mask)
-print("attention_weights:",attention_weights)
+output, attention_weights, _ = scaled_dot_product_attention(dec_q, dec_k, dec_v, look_ahead_mask)
+print("attention_weights:", attention_weights)
 # 就跟一般的 Seq2Seq 模型相同，Transformer 裡頭的 Decoder 在生成輸出序列時也是一次產生一個子詞。因此跟輸入的英文句子不同，中文句子裡頭的每個子詞都是在不同時間點產生的。所以理論上 Decoder
 # 在時間點 t - 1 （或者說是位置 t - 1）已經生成的子詞 subword_t_minus_1 在生成的時候是不可能能夠關注到下個時間點 t（位置 t）所生成的子詞 subword_t 的，儘管它們在 Transformer
 # 裡頭同時被做矩陣運算。
-print("attention_weights of the first word:", attention_weights[:,0,:])
+print("attention_weights of the first word:", attention_weights[:, 0, :])
 # 兩個句子的第一個子詞因為自己前面已經沒有其他子詞，所以將全部的注意力 1都放在自己身上。
-print("attention_weights of the second word:", attention_weights[:,1,:])
+print("attention_weights of the second word:", attention_weights[:, 1, :])
 # 兩個句子的第 2 個子詞因為只能看到序列中的第一個子詞以及自己，因此前兩個位置的注意權重加總即為 1，後面位置的權重皆為 0。
-print(100*'-')
+print(100 * '-')
 
 # multi-head attention
 # 將 Q、K 以及 V 這三個張量先個別轉換到 d_model 維空間，再將其拆成多個比較低維的 depth 維度 N 次以後，將這些產生的小 q、小 k 以及小 v
@@ -158,16 +160,16 @@ print(100*'-')
 # transform a d_model vectoer into a num_heads * depth vector: (d_model: the dim of each word: 4)
 num_heads = 2
 x = emb_en
-output = split_heads(emb_en,d_model,num_heads)
+output = split_heads(emb_en, d_model, num_heads)
 print("before multi-head transform:", x)
-print("after multi-head transform:",output)
-print(100*'-')
+print("after multi-head transform:", output)
+print(100 * '-')
 # 3 維詞嵌入張量 emb_en 已經被轉換成一個 4 維張量了，且最後一個維度 shape[-1] = 4 被拆成兩半.
 # 觀察 split_heads 的輸入輸出，你會發現序列裡每個子詞原來為 d_model 維的
 # reprsentation 被拆成多個相同但較短的 depth 維度。而每個 head 的 2 維矩陣事實上仍然代表原來的序列，只是裡頭子詞的 repr. 維度降低了。
 
 # test MultiHeadAttention:
-assert d_model == emb_en.shape[-1]  == 4
+assert d_model == emb_en.shape[-1] == 4
 num_heads = 2
 
 print(f"d_model: {d_model}")
@@ -191,8 +193,24 @@ print("wq.shape:", wq.shape)
 print("wk.shape:", wk.shape)
 print("wv.shape:", wv.shape)
 print("output.shape:", output.shape)
-print("scaled output.shape:",scaled_attention.shape)
+print("scaled output.shape:", scaled_attention.shape)
 print("attention_weights.shape:", attention_weights.shape)
 print("scaled_attention_logits.shape:", scaled_attention_logits.shape)
 
 print("\noutput:", output)
+print(100*'-')
+
+# test the position_wise feed forward network
+print("test the position_wise_feed_forward_network:")
+batch_size = 64
+seq_len = 10
+d_model = 512
+dff = 2048
+
+x = tf.random.uniform((batch_size,seq_len,d_model))
+ffn = point_wise_feed_forward_network(d_model,dff)
+output = ffn(x)
+print("input shape:",x.shape,"\n")
+print("input:",x)
+print("\noutput shape:",output.shape)
+print("\noutput:",output)
