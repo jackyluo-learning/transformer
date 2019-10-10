@@ -214,3 +214,8 @@ print("input shape:",x.shape,"\n")
 print("input:",x)
 print("\noutput shape:",output.shape)
 print("\noutput:",output)
+print(100*'-')
+
+# encoder layer: 一個 Encoder layer 裡頭會有兩個 sub-layers，分別為 MHA 以及 FFN。在 Add & Norm 步驟裡頭，每個 sub-layer 會有一個殘差連結（residual
+# connection）來幫助減緩梯度消失（Gradient Vanishing）的問題。接著兩個 sub-layers 都會針對最後一維 d_model 做 layer normalization，將 batch
+# 裡頭每個子詞的輸出獨立做轉換，使其平均與標準差分別靠近 0 和 1 之後輸出。
