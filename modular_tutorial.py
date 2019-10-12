@@ -11,6 +11,7 @@ from split_heads import split_heads
 from pprint import pprint
 from position_wise_feed_forward_network import point_wise_feed_forward_network
 from EncoderLayer import EncoderLayer
+from DecoderLayer import DecoderLayer
 
 logging.basicConfig(level=logging.ERROR)
 np.set_printoptions(suppress=True)
@@ -190,6 +191,7 @@ print("v.shape:", v.shape)
 print("padding_mask.shape:", padding_mask.shape)
 
 wq, wk, wv, output, scaled_attention, attention_weights, scaled_attention_logits = mha(v, k, q, mask)
+print("mask:", mask)
 print("wq.shape:", wq.shape)
 print("wk.shape:", wk.shape)
 print("wv.shape:", wv.shape)
@@ -228,14 +230,62 @@ dff = 8
 
 # construct a encoder layer that uses the above inputs:
 enc_layer = EncoderLayer(d_model, num_heads, dff)
-padding_mask = create_padding_mask(en)
-enc_out = enc_layer(emb_en, training=False, mask=padding_mask)
+en_padding_mask = create_padding_mask(en)
+enc_out = enc_layer(emb_en, training=False, mask=en_padding_mask)
 
 print("en:", en, "\n")
 print(20 * '-')
-print("padding_mask:", padding_mask, "\n")
+print("en_padding_mask:", padding_mask, "\n")
 print(20 * '-')
 print("emb_en:", emb_en, "\n")
 print(20 * '-')
 print("enc_out:", enc_out, "\n")
 print(emb_en.shape == enc_out.shape)
+print(100*'-')
+
+# combined_mask in DecoderLayer:
+print("Combined_mask in DecoderLayer:")
+"""
+combined mask is the maximum of the two masks: look_ahead_mask and padding_mask
+"""
+zh_padding_mask = create_padding_mask(zh)
+look_ahead_mask = create_look_ahead_mask(zh.shape[-1])
+combined_mask = tf.maximum(zh_padding_mask,look_ahead_mask)
+
+print("zh:",zh,"\n")
+print(20*'-')
+print("zh_padding_mask:",zh_padding_mask,"\nzh_padding_mask.shape:",zh_padding_mask.shape)
+print(20*'-')
+print("look_ahead_mask:",look_ahead_mask,"\n")
+print(20*'-')
+print("combined_mask:",combined_mask,"\n")
+print(100*'-')
+
+print("DecoderLayer: \n")
+# hyperparameters:
+d_model = 4
+num_heads = 2
+dff = 8
+
+# construt decoder layer
+dec_layer = DecoderLayer(d_model,num_heads,dff)
+
+# create masks
+zh_padding_mask = create_padding_mask(zh)
+look_ahead_mask = create_look_ahead_mask(zh.shape[-1])
+combined_mask = tf.maximum(zh_padding_mask,look_ahead_mask)
+
+# init decoder layer
+dec_out, dec_self_attention_weights, dec_enc_attention_weights = dec_layer(emb_zh,enc_out,False,combined_mask,en_padding_mask)
+
+print("emb_zh:",emb_zh)
+print(20*'-')
+print("enc_out:",enc_out)
+print(20*'-')
+print("dec_out:",dec_out)
+print(enc_out.shape==dec_out.shape)
+print(20*'-')
+print("dec_self_attention_weights.shape:",dec_self_attention_weights.shape)
+print(20*'-')
+print("dec_enc_attention_weights.shape:",dec_enc_attention_weights.shape)
+
