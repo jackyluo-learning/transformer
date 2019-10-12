@@ -12,6 +12,8 @@ from pprint import pprint
 from position_wise_feed_forward_network import point_wise_feed_forward_network
 from EncoderLayer import EncoderLayer
 from DecoderLayer import DecoderLayer
+from Encoder import Encoder
+from Decoder import Decoder
 
 logging.basicConfig(level=logging.ERROR)
 np.set_printoptions(suppress=True)
@@ -288,4 +290,59 @@ print(20*'-')
 print("dec_self_attention_weights.shape:",dec_self_attention_weights.shape)
 print(20*'-')
 print("dec_enc_attention_weights.shape:",dec_enc_attention_weights.shape)
+print(100*'-')
+
+# test Encoder
+print("Encoder:\n")
+# 超參數
+num_layers = 2 # 2 層的 Encoder
+d_model = 4
+num_heads = 2
+dff = 8
+input_vocab_size = vocab_size_en # 記得加上 <start>, <end>
+
+# 初始化一個 Encoder
+encoder = Encoder(num_layers, d_model, num_heads, dff, input_vocab_size)
+
+# 將 2 維的索引序列丟入 Encoder 做編碼
+enc_out = encoder(en, training=False, mask=en_padding_mask)
+print("en:", en)
+print("-" * 20)
+print("enc_out:", enc_out)
+print(100*'-')
+
+# test decoder
+print("Decoder:\n")
+# 超參數
+num_layers = 2 # 2 層的 Decoder
+d_model = 4
+num_heads = 2
+dff = 8
+target_vocab_size = vocab_size_zh # 記得加上 <start>, <end>
+
+# 遮罩
+en_padding_mask = create_padding_mask(en)
+zh_padding_mask = create_padding_mask(zh)
+look_ahead_mask = create_look_ahead_mask(zh.shape[1])
+combined_mask = tf.math.maximum(zh_padding_mask, look_ahead_mask)
+
+# 初始化一個 Decoder
+decoder = Decoder(num_layers, d_model, num_heads, dff, target_vocab_size)
+
+# 將 2 維的索引序列以及遮罩丟入 Decoder
+print("zh:", zh)
+print("-" * 20)
+print("combined_mask:", combined_mask)
+print("-" * 20)
+print("enc_out:", enc_out)
+print("-" * 20)
+print("en_padding_mask:", en_padding_mask)
+print("-" * 20)
+dec_out, attention_weights = decoder(zh, enc_out, training=False,
+                        combined_mask=combined_mask,
+                        inp_padding_mask=en_padding_mask)
+print("dec_out:", dec_out)
+print("-" * 20)
+for block_name, attn_weights in attention_weights.items():
+  print(f"{block_name}.shape: {attn_weights.shape}")
 

@@ -6,8 +6,8 @@ import numpy as np
 vq = tf.constant([[0, 0, 1],
                   [1, 1, 1]])
 vk = tf.constant([[2, 2, 3]])
-print(vq)
-print(vk)
+print(vq.shape[1])
+print(tf.shape(vq)[1])
 print(vq + vk)
 print(tf.maximum(vq, vk))
 print(100 * '-')
