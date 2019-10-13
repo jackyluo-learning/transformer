@@ -3,13 +3,14 @@ import load_dataset as lds
 import tensorflow as tf
 import numpy as np
 
-vq = tf.constant([[0, 0, 1],
-                  [1, 1, 1]])
+vq = tf.constant([[0, 0, 0],
+                  [0, 1, 2]])
 vk = tf.constant([[2, 2, 3]])
 print(vq.shape[1])
 print(tf.shape(vq)[1])
-print(vq + vk)
-print(tf.maximum(vq, vk))
+# print(vq + vk)
+# print(tf.maximum(vq, vk))
+print(vq[:,1:2])
 print(100 * '-')
 
 

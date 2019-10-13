@@ -6,6 +6,8 @@ import logging
 import numpy as np
 
 from MultiHeadAttention import MultiHeadAttention
+from loss_function import loss_function
+from loss_object import loss_object
 from scaled_dot_product_attention import scaled_dot_product_attention
 from split_heads import split_heads
 from pprint import pprint
@@ -14,6 +16,7 @@ from EncoderLayer import EncoderLayer
 from DecoderLayer import DecoderLayer
 from Encoder import Encoder
 from Decoder import Decoder
+from Transformer import Transformer
 
 logging.basicConfig(level=logging.ERROR)
 np.set_printoptions(suppress=True)
@@ -243,7 +246,7 @@ print("emb_en:", emb_en, "\n")
 print(20 * '-')
 print("enc_out:", enc_out, "\n")
 print(emb_en.shape == enc_out.shape)
-print(100*'-')
+print(100 * '-')
 
 # combined_mask in DecoderLayer:
 print("Combined_mask in DecoderLayer:")
@@ -252,16 +255,16 @@ combined mask is the maximum of the two masks: look_ahead_mask and padding_mask
 """
 zh_padding_mask = create_padding_mask(zh)
 look_ahead_mask = create_look_ahead_mask(zh.shape[-1])
-combined_mask = tf.maximum(zh_padding_mask,look_ahead_mask)
+combined_mask = tf.maximum(zh_padding_mask, look_ahead_mask)
 
-print("zh:",zh,"\n")
-print(20*'-')
-print("zh_padding_mask:",zh_padding_mask,"\nzh_padding_mask.shape:",zh_padding_mask.shape)
-print(20*'-')
-print("look_ahead_mask:",look_ahead_mask,"\n")
-print(20*'-')
-print("combined_mask:",combined_mask,"\n")
-print(100*'-')
+print("zh:", zh, "\n")
+print(20 * '-')
+print("zh_padding_mask:", zh_padding_mask, "\nzh_padding_mask.shape:", zh_padding_mask.shape)
+print(20 * '-')
+print("look_ahead_mask:", look_ahead_mask, "\n")
+print(20 * '-')
+print("combined_mask:", combined_mask, "\n")
+print(100 * '-')
 
 print("DecoderLayer: \n")
 # hyperparameters:
@@ -270,36 +273,37 @@ num_heads = 2
 dff = 8
 
 # construt decoder layer
-dec_layer = DecoderLayer(d_model,num_heads,dff)
+dec_layer = DecoderLayer(d_model, num_heads, dff)
 
 # create masks
 zh_padding_mask = create_padding_mask(zh)
 look_ahead_mask = create_look_ahead_mask(zh.shape[-1])
-combined_mask = tf.maximum(zh_padding_mask,look_ahead_mask)
+combined_mask = tf.maximum(zh_padding_mask, look_ahead_mask)
 
 # init decoder layer
-dec_out, dec_self_attention_weights, dec_enc_attention_weights = dec_layer(emb_zh,enc_out,False,combined_mask,en_padding_mask)
+dec_out, dec_self_attention_weights, dec_enc_attention_weights = dec_layer(emb_zh, enc_out, False, combined_mask,
+                                                                           en_padding_mask)
 
-print("emb_zh:",emb_zh)
-print(20*'-')
-print("enc_out:",enc_out)
-print(20*'-')
-print("dec_out:",dec_out)
-print(enc_out.shape==dec_out.shape)
-print(20*'-')
-print("dec_self_attention_weights.shape:",dec_self_attention_weights.shape)
-print(20*'-')
-print("dec_enc_attention_weights.shape:",dec_enc_attention_weights.shape)
-print(100*'-')
+print("emb_zh:", emb_zh)
+print(20 * '-')
+print("enc_out:", enc_out)
+print(20 * '-')
+print("dec_out:", dec_out)
+print(enc_out.shape == dec_out.shape)
+print(20 * '-')
+print("dec_self_attention_weights.shape:", dec_self_attention_weights.shape)
+print(20 * '-')
+print("dec_enc_attention_weights.shape:", dec_enc_attention_weights.shape)
+print(100 * '-')
 
 # test Encoder
 print("Encoder:\n")
 # 超參數
-num_layers = 2 # 2 層的 Encoder
+num_layers = 2  # 2 層的 Encoder
 d_model = 4
 num_heads = 2
 dff = 8
-input_vocab_size = vocab_size_en # 記得加上 <start>, <end>
+input_vocab_size = vocab_size_en  # 記得加上 <start>, <end>
 
 # 初始化一個 Encoder
 encoder = Encoder(num_layers, d_model, num_heads, dff, input_vocab_size)
@@ -309,16 +313,16 @@ enc_out = encoder(en, training=False, mask=en_padding_mask)
 print("en:", en)
 print("-" * 20)
 print("enc_out:", enc_out)
-print(100*'-')
+print(100 * '-')
 
 # test decoder
 print("Decoder:\n")
 # 超參數
-num_layers = 2 # 2 層的 Decoder
+num_layers = 2  # 2 層的 Decoder
 d_model = 4
 num_heads = 2
 dff = 8
-target_vocab_size = vocab_size_zh # 記得加上 <start>, <end>
+target_vocab_size = vocab_size_zh  # 記得加上 <start>, <end>
 
 # 遮罩
 en_padding_mask = create_padding_mask(en)
@@ -339,10 +343,57 @@ print("-" * 20)
 print("en_padding_mask:", en_padding_mask)
 print("-" * 20)
 dec_out, attention_weights = decoder(zh, enc_out, training=False,
-                        combined_mask=combined_mask,
-                        inp_padding_mask=en_padding_mask)
+                                     combined_mask=combined_mask,
+                                     inp_padding_mask=en_padding_mask)
 print("dec_out:", dec_out)
 print("-" * 20)
 for block_name, attn_weights in attention_weights.items():
-  print(f"{block_name}.shape: {attn_weights.shape}")
+    print(f"{block_name}.shape: {attn_weights.shape}")
+print(100 * '-')
+
+# 测试transformer
+print("test with the transformer:\n")
+# 超參數
+num_layers = 1
+d_model = 4
+num_heads = 2
+dff = 8
+
+tar_train = zh[:, :-1]  # means in the second dim, right-shift one pos (the beginning of LHS minus 1)
+tar_real = zh[:, 1:]  # means in the second dim, left-shift one pos (the beginning of RHS plus 1)
+# try to read one char in the tar_train, then generate the next char, so the next
+# char it generate should be compared with the sequence after left-shift, that is
+# tar_real.
+
+inp_padding_mask = create_padding_mask(en)
+tar_padding_mask = create_padding_mask(tar_train)
+look_ahead_mask = create_look_ahead_mask(tar_train.shape[1])
+combined_mask = tf.math.maximum(tar_padding_mask, look_ahead_mask)
+
+transformer = Transformer(num_layers, d_model, num_heads, dff, vocab_size_en, vocab_size_zh)
+
+predictions, attention_weights = transformer(en, tar_train, False, inp_padding_mask, combined_mask, inp_padding_mask)
+
+print("tar:", zh)
+print(20 * '-')
+print("tar_train:", tar_train)
+print(20 * '-')
+print("tar_real:", tar_real)
+print(20 * '-')
+print("prediction:", predictions)
+print(100 * '-')
+
+# loss_cross_entropy
+print("sparse cross entropy:")
+real = tf.constant([2, 1, 2], dtype=tf.float32)
+# represent the expected pos of the largest number in sequence.
+pred = tf.constant([[3, 0, 5], [0, 1, 0], [0, 1, 3]], dtype=tf.float32)
+# this will be computed by softmax,
+# then come out the pos of largest one, for
+# example [3, 0, 5], the largest is 5 and its index is 2, so the cost of this is small because the expected pos is
+# also 2
+print(loss_object(real, pred))  # tf.Tensor([2.1328452  0.55144465 3.169846  ], shape=(3,), dtype=float32)
+print(loss_function(real,pred))
+
+
 
