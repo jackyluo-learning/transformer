@@ -4,7 +4,9 @@ import load_dictionary as ld
 import load_dataset as lds
 import logging
 import numpy as np
+import matplotlib.pyplot as plt
 
+from CustomSchedule import CustomSchedule
 from MultiHeadAttention import MultiHeadAttention
 from loss_function import loss_function
 from loss_object import loss_object
@@ -394,6 +396,29 @@ pred = tf.constant([[3, 0, 5], [0, 1, 0], [0, 1, 3]], dtype=tf.float32)
 # also 2
 print(loss_object(real, pred))  # tf.Tensor([2.1328452  0.55144465 3.169846  ], shape=(3,), dtype=float32)
 print(loss_function(real,pred))
+print(100*'-')
 
+# CustomSchedule
+# 這 schedule 讓訓練過程的前 warmup_steps 的 learning rate 線性增加，
+# 在那之後則跟步驟數 step_num 的反平方根成比例下降。
+print("CustomSchedule:")
+d_models = [128, 256, 512]
+warmup_steps = [1000 * i for i in range(1, 4)]
 
+schedules = []
+labels = []
+colors = ["blue", "red", "black"]
+for d in d_models:
+  schedules += [CustomSchedule(d, s) for s in warmup_steps]
+  labels += [f"d_model: {d}, warm: {s}" for s in warmup_steps]
+
+for i, (schedule, label) in enumerate(zip(schedules, labels)):
+  plt.plot(schedule(tf.range(10000, dtype=tf.float32)),
+           label=label, color=colors[i // 3])
+
+plt.legend()
+
+plt.ylabel("Learning Rate")
+plt.xlabel("Train Step")
+plt.show()
 
