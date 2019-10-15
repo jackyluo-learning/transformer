@@ -2,6 +2,8 @@ import tensorflow as tf
 from tensorflow.keras import layers
 import numpy as np
 
+from transformer_train import test
+
 print(tf.__version__)
 print(tf.keras.__version__)
 
@@ -48,3 +50,5 @@ dataset = dataset.batch(100)
 dataset = dataset.repeat()
 
 model.fit(dataset, epochs=10,steps_per_epoch=30)
+
+test()

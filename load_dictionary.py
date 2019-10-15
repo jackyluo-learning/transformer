@@ -24,3 +24,6 @@ def load_dictionary():
     logging.info(f"process time: {end - start}")
 
     return subword_encoder_en, subword_encoder_zh
+
+def test():
+    print("testing")

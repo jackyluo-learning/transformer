@@ -62,7 +62,7 @@ def tf_encode(en_t,
 
 
 demo_examples = demo_examples.map(tf_encode)
-demo_examples = demo_examples.padded_batch(batch_size, padded_shapes=([10], [10]))
+demo_examples = demo_examples.padded_batch(batch_size, padded_shapes=([-1], [-1]))
 
 en, zh = next(iter(demo_examples))
 print("encode the two set of en-zh sentence: ")
