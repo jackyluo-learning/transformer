@@ -18,7 +18,7 @@ class DecoderLayer(tf.keras.layers.Layer):
     也會去關注 Encoder 輸出的英文子詞（的 repr.）。
     """
 
-    def __init__(self, d_model, num_heads, dff, rate=0.1):
+    def  __init__(self, d_model, num_heads, dff, rate=0.1):
         super(DecoderLayer, self).__init__()
 
         # 3 個 sub-layers 的主角們
