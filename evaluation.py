@@ -2,6 +2,7 @@ import logging
 import os
 import re
 
+import matplotlib
 import tensorflow as tf
 
 from CustomSchedule import CustomSchedule
@@ -10,6 +11,7 @@ from Transformer import Transformer
 import matplotlib.pyplot as plt
 from load_dictionary import load_dictionary
 from load_dataset import load_dataset
+import numpy as np
 from nltk.translate.bleu_score import sentence_bleu
 
 logging.basicConfig(level=logging.ERROR)
@@ -57,38 +59,52 @@ def evaluate(inp_sentence, en_dict, zh_dict, transformer, max_length):
     return tf.squeeze(output, axis=0), attention_weights
 
 
-def plot_attention_weights(attention, sentence, result, layer_name, en_dict, zh_dict):
-    fig = plt.figure(figsize=(16, 8))
+def plot_attention_weights(attention, sentence, result, layer_name, en_dict, zh_dict, max_len_tar=18):
+    zhfont = matplotlib.font_manager.FontProperties(fname='SimHei.ttf')
+    plt.style.use("seaborn-whitegrid")
+    fig = plt.figure(figsize=(17, 7))
 
     sentence = en_dict.encode(sentence)
 
-    attention = tf.squeeze(attention[layer_name], axis=0)
+    # 只顯示中文序列前 `max_len_tar` 個字以避免畫面太過壅擠
+    if max_len_tar:
+        predicted_seq = result[:max_len_tar]
+    else:
+        max_len_tar = len(result)
 
-    for head in range(attention.shape[0]):
+    # 將某一個特定 Decoder layer 裡頭的 MHA 1 或 MHA2 的注意權重拿出來並去掉 batch 維度
+    attention_weights = tf.squeeze(attention[layer_name], axis=0)
+    # (num_heads, tar_seq_len, inp_seq_len)
+
+    # 將每個 head 的注意權重畫出
+    for head in range(attention_weights.shape[0]):
         ax = fig.add_subplot(2, 4, head + 1)
 
-        # 画出注意力权重
-        ax.matshow(attention[head][:-1, :], cmap='viridis')
+        # [注意]我為了將長度不短的英文子詞顯示在 y 軸，將注意權重做了 transpose
+        attn_map = np.transpose(attention_weights[head][:max_len_tar, :])
+        ax.matshow(attn_map, cmap='viridis')  # (inp_seq_len, tar_seq_len)
 
-        fontdict = {'fontsize': 10}
+        fontdict = {"fontproperties": zhfont}
 
-        ax.set_xticks(range(len(sentence) + 2))
-        ax.set_yticks(range(len(result)))
+        ax.set_xticks(range(max(max_len_tar, len(predicted_seq))))
+        ax.set_xlim(-0.5, max_len_tar - 1.5)
 
-        ax.set_ylim(len(result) - 1.5, -0.5)
-
-        ax.set_xticklabels(
-            ['<start>'] + [en_dict.decode([i]) for i in sentence] + ['<end>'],
-            fontdict=fontdict, rotation=90)
-
-        ax.set_yticklabels([zh_dict.decode([i]) for i in result
+        ax.set_yticks(range(len(sentence) + 2))
+        ax.set_xticklabels([zh_dict.decode([i]) for i in predicted_seq
                             if i < zh_dict.vocab_size],
-                           fontdict=fontdict)
+                           fontdict=fontdict, fontsize=18)
+
+        ax.set_yticklabels(
+            ['<start>'] + [en_dict.decode([i]) for i in sentence] + ['<end>'],
+            fontdict=fontdict)
 
         ax.set_xlabel('Head {}'.format(head + 1))
+        ax.tick_params(axis="x", labelsize=12)
+        ax.tick_params(axis="y", labelsize=12)
 
     plt.tight_layout()
     plt.show()
+    plt.close(fig)
 
 
 def translate(sentence, en_dict, zh_dict, transformer, max_length, plot='decoder_layer4_dec_enc'):
@@ -164,32 +180,32 @@ if __name__ == '__main__':
         print("exist")
         ckpt.restore(ckpt_manager.latest_checkpoint)
         last_epoch = int(ckpt_manager.latest_checkpoint.split("-")[-1])
-        print(f'已讀取最新的 checkpoint，模型已訓練 {last_epoch} epochs。')
+        print(f'Loaded latest checkpoint，model has already be trained for {last_epoch} epochs。')
     # transformer = tf.saved_model.load('models/transformer_base')
     print("...Model loaded...")
     print('-' * 20)
-    # translate("China, India, and others have enjoyed continuing growth.", en_dict, zh_dict, transformer,
-    #           p.max_length)
-    score_list = []
-    for (x, (inp, tar)) in enumerate(test_dataset):
-        # for x in range(p.batch_size):
-            print('batch id:', x)
-            sentence = en_dict.decode([i for i in inp if i < en_dict.vocab_size])
-            print('English sentence: ',sentence)
-            print('Encoded input:', inp)
-            print('Real output: ',tar)
-            result, _ = evaluate(sentence, en_dict, zh_dict, transformer, p.max_length)
-            print('Prediction: ',result)
-            print('Prediction sentence: ', zh_dict.decode([i for i in result if i < zh_dict.vocab_size]) )
-            target = tar.numpy().tolist()
-            result = result.numpy().tolist()
-            # print(tar)
-            # print(result)
-            score = sentence_bleu([target], result)
-            print('BLEU: ',score)
-            score_list.append(score)
-
-    print(sum(score_list/len(score_list)))
+    translate("China, India, and others have enjoyed continuing growth.", en_dict, zh_dict, transformer,
+              p.max_length)
+    # score_list = []
+    # for (x, (inp, tar)) in enumerate(test_dataset):
+    #     # for x in range(p.batch_size):
+    #         print('batch id:', x)
+    #         sentence = en_dict.decode([i for i in inp if i < en_dict.vocab_size])
+    #         print('English sentence: ',sentence)
+    #         print('Encoded input:', inp)
+    #         print('Real output: ',tar)
+    #         result, _ = evaluate(sentence, en_dict, zh_dict, transformer, p.max_length)
+    #         print('Prediction: ',result)
+    #         print('Prediction sentence: ', zh_dict.decode([i for i in result if i < zh_dict.vocab_size]) )
+    #         target = tar.numpy().tolist()
+    #         result = result.numpy().tolist()
+    #         # print(tar)
+    #         # print(result)
+    #         score = sentence_bleu([target], result)
+    #         print('BLEU: ',score)
+    #         score_list.append(score)
+    #
+    # print(sum(score_list/len(score_list)))
 
 
 
